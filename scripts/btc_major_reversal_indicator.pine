@@ -1,0 +1,38 @@
+//@version=5
+indicator('BTC Major Reversal Detector', shorttitle='BTC MRD', overlay=true)
+
+emaLength = input.int(title='EMA Length', defval=20, minval=1)
+lookbackBars = input.int(title='Lookback For Trend', defval=10, minval=1)
+atrLength = input.int(title='ATR Length', defval=14)
+riskMultiplier = input.float(title='Stop ATR Multiplier', defval=1.0, step=0.1)
+rewardMultiplier = input.float(title='Reward Multiplier', defval=2.0, step=0.1)
+
+emaValue = ta.ema(close, emaLength)
+avgBody = ta.sma(math.abs(close - open), emaLength)
+atrValue = ta.atr(atrLength)
+
+// determine if the last lookbackBars were mostly below or above EMA
+belowEmaCount = ta.sum(close[1] < emaValue[1], lookbackBars)
+aboveEmaCount = lookbackBars - belowEmaCount
+
+bullSignal = close > emaValue and open < emaValue and belowEmaCount == lookbackBars and (close - open) > avgBody*1.5
+bearSignal = close < emaValue and open > emaValue and aboveEmaCount == lookbackBars and (open - close) > avgBody*1.5
+
+// plot ema
+plot(emaValue, color=color.orange, title='EMA')
+
+var label longLabel = na
+var label shortLabel = na
+
+if bullSignal
+    label.delete(longLabel)
+    entryPrice = close
+    longLabel := label.new(bar_index, low, 'BUY\nSL:' + str.tostring(entryPrice - riskMultiplier*atrValue, format.mintick) + '\nTP:' + str.tostring(entryPrice + riskMultiplier*rewardMultiplier*atrValue, format.mintick), style=label.style_label_up, color=color.green, textcolor=color.white, size=size.small)
+
+if bearSignal
+    label.delete(shortLabel)
+    entryPrice = close
+    shortLabel := label.new(bar_index, high, 'SELL\nSL:' + str.tostring(entryPrice + riskMultiplier*atrValue, format.mintick) + '\nTP:' + str.tostring(entryPrice - riskMultiplier*rewardMultiplier*atrValue, format.mintick), style=label.style_label_down, color=color.red, textcolor=color.white, size=size.small)
+
+a = plot(bullSignal ? low : na, title='Bullish Signal', style=plot.style_circles, color=color.green)
+b = plot(bearSignal ? high : na, title='Bearish Signal', style=plot.style_circles, color=color.red)
